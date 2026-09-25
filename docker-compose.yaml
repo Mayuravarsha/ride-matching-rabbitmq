@@ -1,71 +1,54 @@
-version: "3.3"
 services:
-  rabbitMQ_server:
-    image: rabbitmq
-    container_name: rabbitmq
-    restart: on-failure
-
-  producer:
-    build:
-      context: .
-      dockerfile: Dockerfile_producer
-    container_name: producer
+  rabbitmq:
+    image: rabbitmq:3.13-management
     ports:
-      - "8484:5000"
-    restart: on-failure
-    depends_on:
-      - rabbitMQ_server
-
-  consumer_1:
-    build:
-      context: .
-      dockerfile: Dockerfile_ride_matching
-    container_name: consumer_1
-    restart: on-failure
-    depends_on:
-      - producer
-    environment:
-      - CONSUMER_ID=C1
-      - PRODUCER_ADDRESS=producer:5000
-
-  consumer_2:
-    build:
-      context: .
-      dockerfile: Dockerfile_ride_matching
-    container_name: consumer_2
-    restart: on-failure
-    depends_on:
-      - producer
-    environment:
-      - CONSUMER_ID=C2
-      - PRODUCER_ADDRESS=producer:5000
-  
-  consumer_3:
-    build:
-      context: .
-      dockerfile: Dockerfile_ride_matching
-    container_name: consumer_3
-    restart: on-failure
-    depends_on:
-      - producer
-    environment:
-      - CONSUMER_ID=C3
-      - PRODUCER_ADDRESS=producer:5000
-
-  ride_database:
-    build:
-      context: .
-      dockerfile: Dockerfile_database
-    container_name: ride_database
-    restart: on-failure
-    depends_on:
-      - producer
-      - mongodb
+      - "15672:15672"       # management UI (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   mongodb:
-    image: mongo
-    container_name: mongodb
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  producer:
+    build: .
+    ports:
+      - "8484:5000"
     depends_on:
-      - producer
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 5s
+      retries: 20
     restart: on-failure
-  
+
+  matcher:
+    build: .
+    command: ["python", "-m", "ridematch.matcher"]
+    environment:
+      PRODUCER_ADDRESS: producer:5000
+      RIDE_TIME_SCALE: "1"
+    depends_on:
+      producer:
+        condition: service_healthy
+    deploy:
+      replicas: 3           # scale with: docker compose up --scale matcher=N
+    restart: on-failure
+
+  db_writer:
+    build: .
+    command: ["python", "-m", "ridematch.db_writer"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: on-failure

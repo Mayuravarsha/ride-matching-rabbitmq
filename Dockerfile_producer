@@ -1,9 +1,0 @@
-FROM python
-
-RUN mkdir -p /app/producer \ && pip3 install pika flask
-
-ENV FLASK_APP=producer
-WORKDIR /app/producer
-COPY producer.py ./
-
-CMD [ "flask", "run", "--host=0.0.0.0" ]
