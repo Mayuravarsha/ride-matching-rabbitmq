@@ -1,0 +1,9 @@
+FROM python
+
+RUN mkdir -p /app/consumer \
+    && pip3 install pika pymongo
+
+WORKDIR /app/consumer
+COPY database_consumer.py ./
+
+CMD ["python3", "database_consumer.py" ]

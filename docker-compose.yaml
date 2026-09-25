@@ -1,0 +1,71 @@
+version: "3.3"
+services:
+  rabbitMQ_server:
+    image: rabbitmq
+    container_name: rabbitmq
+    restart: on-failure
+
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile_producer
+    container_name: producer
+    ports:
+      - "8484:5000"
+    restart: on-failure
+    depends_on:
+      - rabbitMQ_server
+
+  consumer_1:
+    build:
+      context: .
+      dockerfile: Dockerfile_ride_matching
+    container_name: consumer_1
+    restart: on-failure
+    depends_on:
+      - producer
+    environment:
+      - CONSUMER_ID=C1
+      - PRODUCER_ADDRESS=producer:5000
+
+  consumer_2:
+    build:
+      context: .
+      dockerfile: Dockerfile_ride_matching
+    container_name: consumer_2
+    restart: on-failure
+    depends_on:
+      - producer
+    environment:
+      - CONSUMER_ID=C2
+      - PRODUCER_ADDRESS=producer:5000
+  
+  consumer_3:
+    build:
+      context: .
+      dockerfile: Dockerfile_ride_matching
+    container_name: consumer_3
+    restart: on-failure
+    depends_on:
+      - producer
+    environment:
+      - CONSUMER_ID=C3
+      - PRODUCER_ADDRESS=producer:5000
+
+  ride_database:
+    build:
+      context: .
+      dockerfile: Dockerfile_database
+    container_name: ride_database
+    restart: on-failure
+    depends_on:
+      - producer
+      - mongodb
+
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    depends_on:
+      - producer
+    restart: on-failure
+  
